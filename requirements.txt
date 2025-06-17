@@ -2,5 +2,5 @@ python-dotenv
 PyPDF2
 streamlit
 sentence-transformers
-pinecone-client
+pinecone
 google-generativeai
