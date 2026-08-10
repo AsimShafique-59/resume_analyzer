@@ -4,3 +4,7 @@ streamlit
 sentence-transformers
 pinecone
 google-generativeai
+fastapi
+uvicorn[standard]
+python-docx
+python-multipart
