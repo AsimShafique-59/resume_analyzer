@@ -1,5 +1,9 @@
+// In dev, Vite proxies '/api' to the local backend (see vite.config.js).
+// In production, set VITE_API_BASE to the deployed backend's public URL at build time.
+const API_BASE = import.meta.env.VITE_API_BASE || '/api'
+
 async function postForm(path, form) {
-  const res = await fetch('/api' + path, { method: 'POST', body: form })
+  const res = await fetch(API_BASE + path, { method: 'POST', body: form })
   const data = await res.json()
   if (!res.ok) throw new Error(data.detail || res.statusText)
   return data
@@ -26,13 +30,13 @@ export function generateCoverLetter(jobDescription, file, resumeId = null) {
 }
 
 export async function getDashboard() {
-  const res = await fetch('/api/dashboard')
+  const res = await fetch(API_BASE + '/dashboard')
   if (!res.ok) throw new Error(res.statusText)
   return res.json()
 }
 
 export async function listResumes() {
-  const res = await fetch('/api/resumes')
+  const res = await fetch(API_BASE + '/resumes')
   if (!res.ok) throw new Error(res.statusText)
   return res.json()
 }
