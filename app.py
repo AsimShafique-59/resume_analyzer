@@ -8,19 +8,19 @@ import io
 import json
 import os
 
-import google.generativeai as genai
 import numpy as np
 import PyPDF2
 from docx import Document
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from groq import Groq
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-gemini = genai.GenerativeModel("gemini-2.0-flash-lite")
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+GROQ_MODEL = "llama-3.3-70b-versatile"
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
 app = FastAPI(title="Resume Parsing & Matching MVP")
@@ -64,21 +64,25 @@ def extract_text(filename: str, raw: bytes) -> str:
     raise HTTPException(400, "Only PDF and DOCX resumes are supported")
 
 
-def ask_gemini_json(prompt: str) -> dict:
-    response = gemini.generate_content(prompt)
-    cleaned = response.text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+def ask_groq_json(prompt: str) -> dict:
+    response = groq_client.chat.completions.create(
+        model=GROQ_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
+    )
+    content = response.choices[0].message.content
     try:
-        return json.loads(cleaned)
+        return json.loads(content)
     except json.JSONDecodeError:
-        raise HTTPException(502, f"Model returned non-JSON response: {cleaned[:200]}")
+        raise HTTPException(502, f"Model returned non-JSON response: {content[:200]}")
 
 
 def parse_profile(text: str) -> dict:
-    return ask_gemini_json(PROFILE_PROMPT.format(text=text[:8000]))
+    return ask_groq_json(PROFILE_PROMPT.format(text=text[:8000]))
 
 
 def generate_cover_letter(resume_text: str, job_description: str) -> dict:
-    return ask_gemini_json(COVER_LETTER_PROMPT.format(resume_text=resume_text[:8000], job_description=job_description))
+    return ask_groq_json(COVER_LETTER_PROMPT.format(resume_text=resume_text[:8000], job_description=job_description))
 
 
 def cosine(a: np.ndarray, b: np.ndarray) -> float:

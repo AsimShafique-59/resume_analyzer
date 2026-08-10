@@ -1,7 +1,7 @@
 python-dotenv
 PyPDF2
 sentence-transformers
-google-generativeai
+groq
 fastapi
 uvicorn[standard]
 python-docx
