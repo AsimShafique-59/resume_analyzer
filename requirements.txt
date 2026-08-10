@@ -1,8 +1,6 @@
 python-dotenv
 PyPDF2
-streamlit
 sentence-transformers
-pinecone
 google-generativeai
 fastapi
 uvicorn[standard]
