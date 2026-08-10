@@ -42,11 +42,14 @@ cached, so results reflect the specific file uploaded.
 ## Architecture
 
 ```
-frontend/ (React + Vite)  --/api/*-->  proxy  -->  backend (FastAPI, :8000)
+frontend/ (React + Vite)  --/api/*-->  proxy  -->  backend/ (FastAPI, :8000)
                                                        |-- PyPDF2 / python-docx   (text extraction)
                                                        |-- sentence-transformers  (match scoring)
                                                        └-- Groq LLM               (parsing, cover letters, feedback)
 ```
+
+`backend/` and `frontend/` are independent siblings — separate dependencies,
+separate deploys, nothing shared between them except the HTTP API.
 
 Parsed resumes are saved to a shared library (SQLite, `app.db`) keyed by
 filename, so they can be reused across tabs without re-uploading. Each
@@ -59,16 +62,16 @@ concurrent writers or multi-user production use.
 ## Setup
 
 ```bash
-cd resume_analyzer
+cd resume_analyzer/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-cd frontend
+cd ../frontend
 npm install
 ```
 
-Create `resume_analyzer/.env`:
+Create `resume_analyzer/backend/.env`:
 
 ```
 GROQ_API_KEY=your_key_here
@@ -101,18 +104,18 @@ Interactive docs at `http://localhost:8000/docs` while the backend is running.
 
 ## Deploy to Railway
 
-This repo is a monorepo: the backend lives at the repo root, the frontend in
-`frontend/`. Deploy them as two separate Railway services from the same
-GitHub repo — each service gets its own root directory, build, and domain.
+This repo is a monorepo: `backend/` and `frontend/` are siblings. Deploy them
+as two separate Railway services from the same GitHub repo — each service
+gets its own root directory, build, and domain.
 
 ### 1. Backend service
 
 1. New Project → Deploy from GitHub repo → pick this repo.
-2. Leave **root directory** as `/` (repo root already has `app.py`,
+2. Settings → **Root Directory** → `backend` (has `app.py`,
    `requirements.txt`, and a `Procfile` — Railway's Railpack builder detects
    Python automatically and the `Procfile` sets the start command:
    `uvicorn app:app --host 0.0.0.0 --port $PORT`).
-3. Variables → add `GROQ_API_KEY` (same value as your local `.env`).
+3. Variables → add `GROQ_API_KEY` (same value as your local `backend/.env`).
 4. Settings → Networking → **Generate Domain** to get a public URL
    (e.g. `https://backend-production-xxxx.up.railway.app`).
 
