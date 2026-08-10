@@ -48,10 +48,13 @@ frontend/ (React + Vite)  --/api/*-->  proxy  -->  backend (FastAPI, :8000)
                                                        └-- Groq LLM               (parsing, cover letters, feedback)
 ```
 
-Stateless by design — no database. Each request parses/matches/generates
-within itself; the dashboard just re-renders the last `/match` response held
-in frontend state. Add persistence (e.g. SQLite/Postgres) if candidates need
-to survive across requests or across recruiters.
+Parsed resumes are saved to a shared library (SQLite, `app.db`) keyed by
+filename, so they can be reused across tabs without re-uploading. Each
+`/match` run is also persisted, and `/dashboard` returns the latest run —
+survives a page refresh or server restart.
+ponytail: SQLite is a single file, fine for one recruiter's workload. Move to
+Postgres (+ a Railway volume, or S3 for the resume files) if this needs
+concurrent writers or multi-user production use.
 
 ## Setup
 
@@ -88,12 +91,59 @@ both). Open `http://localhost:5173`.
 
 | Endpoint | Method | Input | Output |
 |---|---|---|---|
-| `/parse-resume` | POST | resume file | structured profile JSON |
-| `/match` | POST | `job_description` (query param) + resume files | ranked list of `{filename, score, profile}` |
-| `/cover-letter` | POST | `job_description` (query param) + resume file | `{cover_letter, feedback[]}` |
+| `/parse-resume` | POST | resume file | structured profile JSON (saved to the library) |
+| `/resumes` | GET | — | library list: `[{id, filename, name}]` |
+| `/match` | POST | `job_description` (query param) + resume files and/or `resume_ids` | ranked list of `{filename, score, profile}` |
+| `/cover-letter` | POST | `job_description` (query param) + resume file or `resume_id` | `{cover_letter, feedback[]}` |
+| `/dashboard` | GET | — | latest match run: `{job_description, results[]}` |
 
 Interactive docs at `http://localhost:8000/docs` while the backend is running.
 
+## Deploy to Railway
+
+This repo is a monorepo: the backend lives at the repo root, the frontend in
+`frontend/`. Deploy them as two separate Railway services from the same
+GitHub repo — each service gets its own root directory, build, and domain.
+
+### 1. Backend service
+
+1. New Project → Deploy from GitHub repo → pick this repo.
+2. Leave **root directory** as `/` (repo root already has `app.py`,
+   `requirements.txt`, and a `Procfile` — Railway's Railpack builder detects
+   Python automatically and the `Procfile` sets the start command:
+   `uvicorn app:app --host 0.0.0.0 --port $PORT`).
+3. Variables → add `GROQ_API_KEY` (same value as your local `.env`).
+4. Settings → Networking → **Generate Domain** to get a public URL
+   (e.g. `https://backend-production-xxxx.up.railway.app`).
+
+By default `app.db` (SQLite) lives on the container's ephemeral disk — it
+resets on every redeploy. If you want the resume library and dashboard to
+survive redeploys, attach a Railway **volume** (Settings → Volumes, mount
+path e.g. `/data`), then add a `DB_PATH=/data/app.db` variable — `app.py`
+already reads `DB_PATH` from the environment.
+
+### 2. Frontend service
+
+1. Add another service in the same project → same GitHub repo.
+2. Settings → **Root Directory** → `frontend`.
+3. Variables → add `VITE_API_BASE` = the backend's public URL from step 1.4
+   (no trailing slash) — this gets baked into the build, so set it *before*
+   the first deploy.
+4. Variables → add `RAILPACK_STATIC_FILE_ROOT` = `dist` (Vite builds to
+   `frontend/dist`; this tells Railpack to serve that folder as a static
+   site instead of trying to run a Node server).
+5. Settings → Networking → **Generate Domain**.
+
+### 3. After both are live
+
+Push to `main` and both services redeploy automatically — that's the whole
+"deploy on my own" workflow going forward, no CLI needed.
+
+If you ever change `VITE_API_BASE`, you must trigger a frontend rebuild
+(redeploy) for it to take effect — it's compiled into the JS bundle, not
+read at runtime.
+
 ## Tech stack
 
-Python, FastAPI, Groq (LLM), sentence-transformers (embeddings), React, Vite.
+Python, FastAPI, Groq (LLM), sentence-transformers (embeddings), SQLite,
+React, Vite. Deploys to Railway.
