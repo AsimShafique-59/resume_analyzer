@@ -89,7 +89,8 @@ main {
 }
 textarea,
 input[type='text'],
-input[type='file'] {
+input[type='file'],
+select {
   width: 100%;
   font: inherit;
   padding: 0.65rem 0.75rem;
@@ -107,10 +108,35 @@ textarea {
   resize: vertical;
 }
 textarea:focus,
-input:focus {
+input:focus,
+select:focus {
   outline: none;
   border-color: var(--brand);
   background: #fff;
+}
+
+.library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 10rem;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 1rem;
+  background: #fbfbfe;
+}
+.library-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.library-item input {
+  margin: 0;
+  width: auto;
 }
 
 .run {

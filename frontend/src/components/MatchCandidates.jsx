@@ -1,22 +1,30 @@
 import { useState } from 'react'
 import { matchCandidates } from '../api'
+import useResumeLibrary from '../useResumeLibrary'
 
 export default function MatchCandidates() {
+  const [library, refreshLibrary] = useResumeLibrary()
   const [jobDescription, setJobDescription] = useState('')
+  const [selectedIds, setSelectedIds] = useState([])
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [results, setResults] = useState(null)
 
+  function toggleId(id) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
   async function handleSubmit() {
-    if (!jobDescription || !files.length) {
-      setError('Add a job description and at least one resume.')
+    if (!jobDescription || (!files.length && !selectedIds.length)) {
+      setError('Add a job description and at least one resume (library or upload).')
       return
     }
     setLoading(true)
     setError(null)
     try {
-      setResults(await matchCandidates(jobDescription, files))
+      setResults(await matchCandidates(jobDescription, files, selectedIds))
+      refreshLibrary()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -27,7 +35,7 @@ export default function MatchCandidates() {
   return (
     <div className="card">
       <h2>Match candidates to a job</h2>
-      <p className="hint">Upload multiple resumes and rank them against a job description.</p>
+      <p className="hint">Pick resumes from your library and/or upload new ones, then rank them against a job description.</p>
 
       <label className="field-label" htmlFor="matchJob">
         Job description
@@ -39,8 +47,22 @@ export default function MatchCandidates() {
         onChange={(e) => setJobDescription(e.target.value)}
       />
 
+      {library.length > 0 && (
+        <>
+          <label className="field-label">Resume library</label>
+          <div className="library-list">
+            {library.map((r) => (
+              <label className="library-item" key={r.id}>
+                <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleId(r.id)} />
+                {r.name || r.filename}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+
       <label className="field-label" htmlFor="matchFiles">
-        Resumes (multiple)
+        Upload new resumes
       </label>
       <input
         id="matchFiles"

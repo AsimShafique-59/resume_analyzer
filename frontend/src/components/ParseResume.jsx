@@ -46,7 +46,12 @@ export default function ParseResume() {
 
       <div className="result">
         {error && <p className="status error">{error}</p>}
-        {profile && <ProfileGrid profile={profile} />}
+        {profile && (
+          <>
+            <p className="status">Saved to your resume library — pick it from Match &amp; Rank or Cover Letter.</p>
+            <ProfileGrid profile={profile} />
+          </>
+        )}
       </div>
     </div>
   )
