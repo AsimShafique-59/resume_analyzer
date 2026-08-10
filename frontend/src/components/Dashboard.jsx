@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { getDashboard } from '../api'
 
 function sortValue(row, key) {
   if (key === 'name') return (row.profile?.name || row.filename).toLowerCase()
@@ -6,11 +7,21 @@ function sortValue(row, key) {
   return ''
 }
 
-export default function Dashboard({ jobDescription, results }) {
+export default function Dashboard() {
   const [sort, setSort] = useState({ key: 'score', dir: -1 })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [data, setData] = useState({ job_description: null, results: [] })
 
+  useEffect(() => {
+    getDashboard()
+      .then(setData)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const results = data.results
   const sorted = useMemo(() => {
-    if (!results) return []
     return [...results].sort((a, b) => {
       const av = sortValue(a, sort.key)
       const bv = sortValue(b, sort.key)
@@ -28,14 +39,16 @@ export default function Dashboard({ jobDescription, results }) {
     <div className="card">
       <h2>Recruiter dashboard</h2>
       <p className="hint">
-        {jobDescription
-          ? `Ranked candidates for: "${jobDescription.slice(0, 90)}${jobDescription.length > 90 ? '…' : ''}"`
+        {data.job_description
+          ? `Ranked candidates for: "${data.job_description.slice(0, 90)}${data.job_description.length > 90 ? '…' : ''}"`
           : 'Run "Match & Rank" first to populate this dashboard.'}
       </p>
 
-      {!results || !results.length ? (
-        <p className="status">No candidates ranked yet.</p>
-      ) : (
+      {loading && <p className="status">Loading…</p>}
+      {error && <p className="status error">{error}</p>}
+      {!loading && !error && !results.length && <p className="status">No candidates ranked yet.</p>}
+
+      {!loading && !error && results.length > 0 && (
         <table className="dashboard-table">
           <thead>
             <tr>

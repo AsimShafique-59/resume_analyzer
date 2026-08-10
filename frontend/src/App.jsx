@@ -14,8 +14,6 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab] = useState('parse')
-  const [jobDescription, setJobDescription] = useState('')
-  const [results, setResults] = useState(null)
 
   return (
     <>
@@ -39,16 +37,9 @@ export default function App() {
         </div>
 
         {tab === 'parse' && <ParseResume />}
-        {tab === 'match' && (
-          <MatchCandidates
-            jobDescription={jobDescription}
-            setJobDescription={setJobDescription}
-            results={results}
-            setResults={setResults}
-          />
-        )}
+        {tab === 'match' && <MatchCandidates />}
         {tab === 'cover' && <CoverLetter />}
-        {tab === 'dashboard' && <Dashboard jobDescription={jobDescription} results={results} />}
+        {tab === 'dashboard' && <Dashboard />}
       </main>
 
       <footer>AI Resume &amp; Job-Matching Platform · MVP</footer>

@@ -22,3 +22,9 @@ export function generateCoverLetter(jobDescription, file) {
   form.append('resume', file)
   return postForm('/cover-letter?job_description=' + encodeURIComponent(jobDescription), form)
 }
+
+export async function getDashboard() {
+  const res = await fetch('/api/dashboard')
+  if (!res.ok) throw new Error(res.statusText)
+  return res.json()
+}

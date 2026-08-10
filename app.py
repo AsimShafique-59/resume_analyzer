@@ -1,12 +1,17 @@
 """FastAPI MVP: resume parsing + job-to-candidate matching.
 
-Stateless by design — no DB. A resume/job description is parsed and
-matched within a single request.
-ponytail: in-memory only, add PostgreSQL when candidates need to persist across requests.
+Parsing and cover-letter generation are stateless (one request in, one
+response out). Match runs are persisted to SQLite so the recruiter dashboard
+survives a page refresh or server restart.
+ponytail: SQLite is a single file, fine for one recruiter's workload. Move to
+Postgres if this needs concurrent writers / multi-user production use.
 """
 import io
 import json
 import os
+import sqlite3
+import uuid
+from datetime import datetime, timezone
 
 import numpy as np
 import PyPDF2
@@ -22,6 +27,34 @@ load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 GROQ_MODEL = "llama-3.3-70b-versatile"
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
+
+DB_PATH = os.path.join(os.path.dirname(__file__), "app.db")
+
+
+def db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db() -> None:
+    with db() as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS matches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                job_description TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                score REAL NOT NULL,
+                profile TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+
+init_db()
 
 app = FastAPI(title="Resume Parsing & Matching MVP")
 app.add_middleware(
@@ -127,4 +160,31 @@ async def match_candidates(job_description: str, resumes: list[UploadFile] = Fil
             continue
         score = cosine(job_emb, embedder.encode(text))
         results.append(MatchResult(filename=resume.filename, score=round(score, 4), profile=parse_profile(text)))
-    return sorted(results, key=lambda r: r.score, reverse=True)
+    results.sort(key=lambda r: r.score, reverse=True)
+
+    run_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    with db() as conn:
+        conn.executemany(
+            "INSERT INTO matches (run_id, job_description, filename, score, profile, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            [(run_id, job_description, r.filename, r.score, json.dumps(r.profile), created_at) for r in results],
+        )
+    return results
+
+
+@app.get("/dashboard")
+async def dashboard():
+    with db() as conn:
+        latest = conn.execute("SELECT run_id, job_description FROM matches ORDER BY created_at DESC LIMIT 1").fetchone()
+        if not latest:
+            return {"job_description": None, "results": []}
+        rows = conn.execute(
+            "SELECT filename, score, profile FROM matches WHERE run_id = ? ORDER BY score DESC",
+            (latest["run_id"],),
+        ).fetchall()
+    return {
+        "job_description": latest["job_description"],
+        "results": [
+            {"filename": r["filename"], "score": r["score"], "profile": json.loads(r["profile"])} for r in rows
+        ],
+    }

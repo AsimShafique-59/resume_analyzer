@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { matchCandidates } from '../api'
 
-export default function MatchCandidates({ jobDescription, setJobDescription, results, setResults }) {
+export default function MatchCandidates() {
+  const [jobDescription, setJobDescription] = useState('')
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [results, setResults] = useState(null)
 
   async function handleSubmit() {
     if (!jobDescription || !files.length) {
